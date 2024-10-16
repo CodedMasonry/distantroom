@@ -4,3 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.89"
+chrono = "0.4.38"
+clap = { version = "4.5.20", features = ["derive"] }
+dirs = "5.0.1"
+log = { version = "0.4.22", features = ["std"] }
+nu-ansi-term = "0.50.1"
+serde = { version = "1.0.210", features = ["alloc", "derive", "serde_derive"] }
+toml = "0.8.19"

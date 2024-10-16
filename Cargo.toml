@@ -1,12 +1,13 @@
 [workspace]
+resolver = "2"
 members = ["distant_operator", "distant_server"]
 
 [profile.dev]
 debug = 0
 
 [profile.release]
+opt-level = "z"
+strip = true
 lto = true
 codegen-units = 1
 panic = "abort"
-opt-level = "z"
-strip = true
