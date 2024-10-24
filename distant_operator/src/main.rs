@@ -1,9 +1,9 @@
-use std::{fs, path::PathBuf};
+use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use distant_operator::{Profile, PROFILE_DIR};
+use distant_operator::{Profile, LOGGER, PROFILE_DIR};
+use log::info;
 use nu_ansi_term::Color;
-use promkit::preset::listbox::Listbox;
 use reedline::{DefaultHinter, DefaultPrompt, Reedline, Signal};
 
 #[derive(Debug, Parser)]
@@ -15,18 +15,20 @@ struct RootArgs {
 
 #[derive(Debug, Subcommand)]
 enum RootSubCommands {
+    /// Import a profile
     Import {
-        #[arg(short, long)]
+        /// The path of a `profile.toml`
         path: PathBuf,
     },
 }
 
 fn main() -> Result<(), anyhow::Error> {
     // Init
-    distant_operator::init()?;
+    log::set_logger(&LOGGER)?;
+    log::set_max_level(log::LevelFilter::Debug);
     parse_root()?;
 
-    let _profile = select_profile()?;
+    let _profile = distant_operator::select_profile()?;
 
     // Init Readline
     let mut line_editor = Reedline::create()
@@ -66,25 +68,10 @@ fn parse_root() -> Result<(), anyhow::Error> {
                 let mut save_path = PROFILE_DIR.clone();
                 save_path.push(path.file_name().unwrap());
 
-                profile.write_to(save_path)?;
+                profile.write_to(save_path.clone())?;
+                info!("Profile saved to {:?}", save_path)
             }
         }
     }
     Ok(())
-}
-
-fn select_profile() -> Result<Profile, anyhow::Error> {
-    let path = PROFILE_DIR.clone();
-
-    let profiles = fs::read_dir(path)?
-        .filter(|v| v.is_ok())
-        .map(|v| v.unwrap().file_name().into_string().unwrap());
-
-    let path = Listbox::new(profiles)
-        .title("Select A Profile")
-        .listbox_lines(5)
-        .prompt()?
-        .run()?;
-
-    Profile::parse(PROFILE_DIR.join(path))
 }
