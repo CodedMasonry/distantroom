@@ -1,3 +1,4 @@
+# An example of the config file used
 address = "0.0.0.0"
 port = 8080
 public_key = "abc"

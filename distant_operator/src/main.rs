@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process};
 
 use clap::{Parser, Subcommand};
 use distant_operator::{Profile, LOGGER, PROFILE_DIR};
@@ -69,7 +69,9 @@ fn parse_root() -> Result<(), anyhow::Error> {
                 save_path.push(path.file_name().unwrap());
 
                 profile.write_to(save_path.clone())?;
-                info!("Profile saved to {:?}", save_path)
+                info!("Profile saved to {:?}", save_path);
+                // Command Finished
+                process::exit(0)
             }
         }
     }

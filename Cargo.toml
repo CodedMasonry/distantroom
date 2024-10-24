@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["distant_server", "distant_operator"]
+members = ["distant_operator"]
+default-members = ["distant_operator"]
 
 [profile.dev]
 debug = 0
