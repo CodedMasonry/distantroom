@@ -8,6 +8,8 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
+	"math/big"
 	"net"
 	"os"
 	"time"
@@ -15,8 +17,16 @@ import (
 	"github.com/charmbracelet/log"
 )
 
+var MaxSerialNumber = big.NewInt(0).SetBytes(bytes.Repeat([]byte{255}, 20))
+
 func makeCA(subject *pkix.Name) (*x509.Certificate, *ecdsa.PrivateKey, error) {
-	caCert := &x509.Certificate{
+	serial, err := generateSerialNumber()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	template := &x509.Certificate{
+		SerialNumber:          serial,
 		Subject:               *subject,
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(time.Hour * 24 * 365),
@@ -27,13 +37,13 @@ func makeCA(subject *pkix.Name) (*x509.Certificate, *ecdsa.PrivateKey, error) {
 	}
 
 	// Generate Cert
-	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	caKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
 		log.Error("Failed to generate encryption key", "error", err)
 		return nil, nil, err
 	}
 
-	caBytes, err := x509.CreateCertificate(rand.Reader, caCert, caCert, caKey.PublicKey, caKey)
+	caBytes, err := x509.CreateCertificate(rand.Reader, template, template, &caKey.PublicKey, caKey)
 	if err != nil {
 		log.Error("Failed to generate certificate", "error", err)
 		return nil, nil, err
@@ -44,58 +54,41 @@ func makeCA(subject *pkix.Name) (*x509.Certificate, *ecdsa.PrivateKey, error) {
 		return nil, nil, err
 	}
 
-	return caCert, caKey, nil
+	return template, caKey, nil
 }
 
-func makeCertWithDNS(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject *pkix.Name, dnsNames []string, fileName string) error {
-	cert := &x509.Certificate{
-		Subject:     *subject,
-		DNSNames:    dnsNames,
-		NotBefore:   time.Now(),
-		NotAfter:    time.Now().Add(time.Hour * 24 * 365),
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:    x509.KeyUsageDigitalSignature,
+func makeCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject *pkix.Name, hosts []string, fileName string) error {
+	serial, err := generateSerialNumber()
+	if err != nil {
+		return err
 	}
 
+	template := &x509.Certificate{
+		SerialNumber: serial,
+		Subject:      *subject,
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(time.Hour * 24 * 365),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+	}
+
+	for _, h := range hosts {
+		if ip := net.ParseIP(h); ip != nil {
+			template.IPAddresses = append(template.IPAddresses, ip)
+		} else {
+			template.DNSNames = append(template.DNSNames, h)
+		}
+	}
+	log.Debug("Generating CA Certificate", "template", template)
+
 	// Generate Cert
-	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	certKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
 		log.Error("Failed to generate encryption key", "error", err)
 		return err
 	}
 
-	certBytes, err := x509.CreateCertificate(rand.Reader, cert, caCert, cert.PublicKey, caKey)
-	if err != nil {
-		log.Error("Failed to generate certificate", "error", err)
-		return err
-	}
-
-	// Logging handled in function
-	if err := saveCert(certBytes, caKey, fileName); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func makeCertWithIPAddress(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject *pkix.Name, ipAddresses []net.IP, fileName string) error {
-	cert := &x509.Certificate{
-		Subject:     *subject,
-		IPAddresses: ipAddresses,
-		NotBefore:   time.Now(),
-		NotAfter:    time.Now().Add(time.Hour * 24 * 365),
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:    x509.KeyUsageDigitalSignature,
-	}
-
-	// Generate Cert
-	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		log.Error("Failed to generate encryption key", "error", err)
-		return err
-	}
-
-	certBytes, err := x509.CreateCertificate(rand.Reader, cert, caCert, cert.PublicKey, caKey)
+	certBytes, err := x509.CreateCertificate(rand.Reader, template, caCert, certKey.PublicKey, caKey)
 	if err != nil {
 		log.Error("Failed to generate certificate", "error", err)
 		return err
@@ -116,27 +109,83 @@ func saveCert(certBytes []byte, key *ecdsa.PrivateKey, name string) error {
 		Type:  "CERTIFICATE",
 		Bytes: certBytes,
 	})
-	if err := os.WriteFile(configPath+"/"+name+".cert", caPEM.Bytes(), 0640); err != nil {
+	if err := os.WriteFile(CONFIG_PATH+"/"+name+".cert", caPEM.Bytes(), 0640); err != nil {
 		log.Error("Failed to save certificae", "error", err)
 		return err
 	}
 
 	// Encode Private
-	caKeyBytes, err := x509.MarshalECPrivateKey(key)
+	caKeyBytes, err := x509.MarshalPKCS8PrivateKey(key)
 	if err != nil {
 		log.Error("Failed to parse private key", "error", err)
 		return err
 	}
 
 	PrivateKeyPEM := new(bytes.Buffer)
-	pem.Encode(caPEM, &pem.Block{
-		Type:  "ECC PRIVATE KEY",
+	pem.Encode(PrivateKeyPEM, &pem.Block{
+		Type:  "PRIVATE KEY",
 		Bytes: caKeyBytes,
 	})
-	if err := os.WriteFile(configPath+"/"+name+".key", PrivateKeyPEM.Bytes(), 0640); err != nil {
+	if err := os.WriteFile(CONFIG_PATH+"/"+name+".key", PrivateKeyPEM.Bytes(), 0640); err != nil {
 		log.Error("Failed to save certificae", "error", err)
 		return err
 	}
+	log.Info("Successfully saved certificate", "path", CONFIG_PATH+"/"+name)
 
 	return nil
+}
+
+func generateSerialNumber() (*big.Int, error) {
+	return rand.Int(rand.Reader, MaxSerialNumber)
+}
+
+func NewCA() (*x509.Certificate, *ecdsa.PrivateKey, error) {
+	log.Debug("Generating Certificate Authority")
+	subject := pkix.Name{
+		CommonName:   "ISRG Root X1",
+		Organization: []string{"Internet Security Research Group"},
+		Country:      []string{"US"},
+	}
+
+	caCert, caKey, err := makeCA(&subject)
+	if err != nil {
+		return nil, nil, err
+	}
+	return caCert, caKey, nil
+}
+
+func LoadCA() (*x509.Certificate, *ecdsa.PrivateKey, error) {
+	log.Info("Loading Certificate Authority", "path", CONFIG_PATH+"/ca.cert")
+	certFile, err := os.ReadFile(CONFIG_PATH + "/ca.cert")
+	if err != nil {
+		log.Warn("File doesn't exist")
+		return NewCA()
+	}
+	keyFile, err := os.ReadFile(CONFIG_PATH + "/ca.key")
+	if err != nil {
+		log.Warn("File doesn't exist")
+		return NewCA()
+	}
+
+	certBlock, _ := pem.Decode(certFile)
+	keyBlock, _ := pem.Decode(keyFile)
+	if certBlock == nil || keyBlock == nil {
+		log.Fatal("Failed to parse CA files; Not valid PEM files")
+	}
+
+	caCert, err := x509.ParseCertificate(certBlock.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	caKey, err := x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	switch caKey.(type) {
+	case *ecdsa.PrivateKey:
+		return caCert, caKey.(*ecdsa.PrivateKey), nil
+	default:
+		return nil, nil, fmt.Errorf("Invalid Key Type; only ECDSA keys are supporteds")
+	}
 }
