@@ -10,10 +10,6 @@ import (
 	"github.com/charmbracelet/log"
 )
 
-type NewOperatorCmd struct {
-	output string `arg:"-o, --output" help:"Directory to output file" default:"."`
-}
-
 var CONFIG_PATH = xdg.ConfigHome + "/distantroom"
 var args struct {
 	NewOperator *NewOperatorCmd `arg:"subcommand:new-operator"`
@@ -23,6 +19,23 @@ var args struct {
 func main() {
 	arg.MustParse(&args)
 
+	// Inits Logging
+	initMain()
+	// Inits Config
+	initState()
+
+	// Handle sub commands
+	switch {
+	case args.NewOperator != nil:
+		log.Info("Generating New Operator")
+		NewOperator(args.NewOperator)
+	default:
+		log.Info("Starting Server")
+		runServer()
+	}
+}
+
+func initMain() {
 	logger := log.New(os.Stderr)
 	logger.SetTimeFormat(time.Stamp)
 	logger.SetReportTimestamp(true)
@@ -37,16 +50,8 @@ func main() {
 	if err := os.MkdirAll(CONFIG_PATH, 0740); err != nil {
 		log.Fatal("Failed to create Configuration Directory", "error", err)
 	}
-
-	initState()
-
-	// Handle sub commands
-	switch {
-	case args.NewOperator != nil:
-		log.Info("Generating New Operator")
-	default:
-		log.Info("Starting Server")
-		runServer()
+	if err := os.MkdirAll(CONFIG_PATH+"/operators/", 0740); err != nil {
+		log.Fatal("Failed to create Configuration Directory", "error", err)
 	}
 }
 

@@ -57,7 +57,7 @@ func makeCA(subject *pkix.Name) (*x509.Certificate, *ecdsa.PrivateKey, error) {
 	return template, caKey, nil
 }
 
-func makeCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject *pkix.Name, hosts []string, fileName string) error {
+func makeOperatorCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject *pkix.Name, hosts []string, fileName string) error {
 	serial, err := generateSerialNumber()
 	if err != nil {
 		return err
@@ -79,7 +79,7 @@ func makeCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject *pkix.N
 			template.DNSNames = append(template.DNSNames, h)
 		}
 	}
-	log.Debug("Generating CA Certificate", "template", template)
+	log.Debug("Generating CA Certificate")
 
 	// Generate Cert
 	certKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
@@ -88,14 +88,14 @@ func makeCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject *pkix.N
 		return err
 	}
 
-	certBytes, err := x509.CreateCertificate(rand.Reader, template, caCert, certKey.PublicKey, caKey)
+	certBytes, err := x509.CreateCertificate(rand.Reader, template, caCert, &certKey.PublicKey, caKey)
 	if err != nil {
 		log.Error("Failed to generate certificate", "error", err)
 		return err
 	}
 
 	// Logging handled in function
-	if err := saveCert(certBytes, caKey, fileName); err != nil {
+	if err := saveCert(certBytes, caKey, "operators/"+fileName); err != nil {
 		return err
 	}
 
@@ -130,7 +130,7 @@ func saveCert(certBytes []byte, key *ecdsa.PrivateKey, name string) error {
 		log.Error("Failed to save certificae", "error", err)
 		return err
 	}
-	log.Info("Successfully saved certificate", "path", CONFIG_PATH+"/"+name)
+	log.Debug("Successfully saved certificate", "path", CONFIG_PATH+"/"+name+".cert")
 
 	return nil
 }
@@ -155,7 +155,7 @@ func NewCA() (*x509.Certificate, *ecdsa.PrivateKey, error) {
 }
 
 func LoadCA() (*x509.Certificate, *ecdsa.PrivateKey, error) {
-	log.Info("Loading Certificate Authority", "path", CONFIG_PATH+"/ca.cert")
+	log.Debug("Loading Certificate Authority", "path", CONFIG_PATH+"/ca.cert")
 	certFile, err := os.ReadFile(CONFIG_PATH + "/ca.cert")
 	if err != nil {
 		log.Warn("File doesn't exist")

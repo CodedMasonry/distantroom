@@ -1,0 +1,10 @@
+# Host that the server is listening on
+host = '0.0.0.0'
+# Port the server is listening on
+port = 8080
+# The Client's Certificate
+certificate = "-----BEGIN CERTIFICATE-----\n-----END CERTIFICATE-----\n"
+# The Client's Private Key
+private_key = "-----BEGIN PRIVATE KEY-----\n-----END PRIVATE KEY-----\n"
+# The Servers's Certificate
+server_certificate = "-----BEGIN CERTIFICATE-----\n-----END CERTIFICATE-----\n"
