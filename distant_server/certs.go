@@ -79,7 +79,7 @@ func makeOperatorCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject
 			template.DNSNames = append(template.DNSNames, h)
 		}
 	}
-	log.Debug("Generating CA Certificate")
+	log.Debug("Generating Certificate")
 
 	// Generate Cert
 	certKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
