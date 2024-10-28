@@ -1,3 +1,4 @@
+#![deny(clippy::all)]
 use std::{path::PathBuf, process};
 
 use clap::{Parser, Subcommand};

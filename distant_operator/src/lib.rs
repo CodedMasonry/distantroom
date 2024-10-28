@@ -1,13 +1,19 @@
-use std::{fs::{self, DirEntry}, path::PathBuf, sync::LazyLock};
+use std::{
+    fs::{self, DirEntry},
+    path::PathBuf,
+    process,
+    sync::LazyLock,
+};
 
 use anyhow::bail;
-use logging::Logger;
+use logging::{log_prefix, Logger};
 use nu_ansi_term::Style;
 use promkit::preset::{confirm::Confirm, listbox::Listbox};
 use reedline::ExternalPrinter;
 use serde::{Deserialize, Serialize};
 
 pub mod logging;
+pub mod server;
 
 // internal
 pub static LOGGER: Logger = Logger;
@@ -38,10 +44,11 @@ pub struct Profile {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProfileInner {
-    pub address: String,
+    pub host: String,
     pub port: u16,
-    public_key: String,
+    certificate: String,
     private_key: String,
+    server_certificate: String,
 }
 
 impl Profile {
@@ -58,18 +65,15 @@ impl Profile {
     }
 
     pub fn write_to(&self, path: PathBuf) -> Result<(), anyhow::Error> {
-        if fs::exists(path.clone()).unwrap_or_default() {
-            if !Confirm::new(format!(
+        if fs::exists(path.clone()).unwrap_or_default() && !Confirm::new(format!(
                 "The file {:?} already exists; Do you want to replace it?",
                 path.file_name().unwrap()
             ))
             .prompt()?
             .run()?
             .to_lowercase()
-            .contains('y')
-            {
-                return Ok(());
-            };
+            .contains('y') {
+            return Ok(());
         }
 
         let str = toml::to_string(&self.inner)?;
@@ -86,7 +90,7 @@ pub fn select_profile() -> Result<Profile, anyhow::Error> {
         .map(|v| format_profile_name(v.unwrap()))
         .collect();
 
-    if profiles.len() == 0 {
+    if profiles.is_empty() {
         bail!(
             "No profiles found in {:?}\n {}: run the `import` command to add a profile",
             PROFILE_DIR.clone(),
@@ -107,7 +111,13 @@ pub fn select_profile() -> Result<Profile, anyhow::Error> {
 fn format_profile_name(file: DirEntry) -> String {
     let file_name = file.file_name().into_string().unwrap();
     let str = fs::read_to_string(file.path()).unwrap();
-    let parsed: ProfileInner = toml::from_str(&str).unwrap();
+    let parsed: ProfileInner = match toml::from_str(&str) {
+        Ok(v) => v,
+        Err(err) => {
+            println!("{} Failed to parse {file_name}\nError: {}\n\nRead the `example.toml` in the repo to see the current format.", log_prefix(log::Level::Error), err.message());
+            process::exit(1)
+        }
+    };
 
-    format!("{} | {}", file_name, parsed.address)
+    format!("{} | {}", file_name, parsed.host)
 }
