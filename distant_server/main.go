@@ -12,7 +12,8 @@ import (
 var CONFIG_PATH = xdg.ConfigHome + "/distantroom"
 var args struct {
 	NewOperator *NewOperatorCmd `arg:"subcommand:new-operator"`
-	Port        uint16          `arg:"--port" help:"Port to listen on" default:"3000"`
+	Port        uint16          `arg:"-p, --port" help:"Port to listen on" default:"3000"`
+	Host        string          `arg:"-h, --host" help:"The host that the client should connect to" default:"0.0.0.0"`
 	Debug       bool            `arg:"-d, --debug" help:"sets log level to debug"`
 }
 
@@ -29,7 +30,6 @@ func main() {
 		log.Info("Generating New Operator")
 		NewOperator(args.NewOperator)
 	default:
-		log.Info("Starting Server")
 		runServer(args.Port)
 	}
 }

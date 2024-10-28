@@ -79,6 +79,26 @@ func makeCA(subject *pkix.Name) (*x509.Certificate, *ecdsa.PrivateKey, error) {
 	return template, certKey, nil
 }
 
+func makeServerCert(subject *pkix.Name) error {
+	template, certKey, err := templateCertificate(subject, nil)
+	if err != nil {
+		return err
+	}
+
+	certBytes, err := x509.CreateCertificate(rand.Reader, template, template, &certKey.PublicKey, certKey)
+	if err != nil {
+		log.Error("Failed to generate certificate", "error", err)
+		return err
+	}
+
+	// Logging handled in function
+	if err := saveCert(certBytes, certKey, "server"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func makeOperatorCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject *pkix.Name, hosts []string) (*bytes.Buffer, *bytes.Buffer, error) {
 	template, certKey, err := templateCertificate(subject, &hosts)
 	if err != nil {
@@ -154,8 +174,8 @@ func generateSerialNumber() (*big.Int, error) {
 func NewCA() (*x509.Certificate, *ecdsa.PrivateKey, error) {
 	log.Debug("Generating Certificate Authority")
 	subject := pkix.Name{
-		CommonName:   "ISRG Root X1",
-		Organization: []string{"Internet Security Research Group"},
+		CommonName:   "WE1",
+		Organization: []string{"Google Trust Services"},
 		Country:      []string{"US"},
 	}
 
@@ -163,6 +183,7 @@ func NewCA() (*x509.Certificate, *ecdsa.PrivateKey, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	log.Info("Created Root Certificate", "path", CONFIG_PATH+"/ca.cert")
 	return caCert, caKey, nil
 }
 
@@ -170,12 +191,10 @@ func LoadCA() (*x509.Certificate, *ecdsa.PrivateKey, error) {
 	log.Debug("Loading Certificate Authority", "path", CONFIG_PATH+"/ca.cert")
 	certFile, err := os.ReadFile(CONFIG_PATH + "/ca.cert")
 	if err != nil {
-		log.Warn("Root Certificate doesn't exist; Generating...")
 		return NewCA()
 	}
 	keyFile, err := os.ReadFile(CONFIG_PATH + "/ca.key")
 	if err != nil {
-		log.Warn("Root Certificate doesn't exist; Generating...")
 		return NewCA()
 	}
 

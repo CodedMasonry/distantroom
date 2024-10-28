@@ -14,7 +14,6 @@ import (
 // CLI format
 type NewOperatorCmd struct {
 	Output string `arg:"--output" help:"Directory to output file" default:"."`
-	Host   string `arg:"-h, --host" help:"The host that the client should connect to" default:"0.0.0.0"`
 	Name   string `arg:"-n, --name" help:"Name of the file"`
 }
 
@@ -30,8 +29,7 @@ type OperatorTemplate struct {
 
 func NewOperator(cmd *NewOperatorCmd) {
 	subject := &pkix.Name{
-		CommonName:   "R11",
-		Organization: []string{"Let's Encrypt"},
+		CommonName:   "Cloudflare",
 		Country:      []string{"US"},
 	}
 
@@ -41,7 +39,7 @@ func NewOperator(cmd *NewOperatorCmd) {
 	}
 
 	// Generate a certificate for client
-	certPEM, keyPEM, err := makeOperatorCert(GLOBAL_STATE.caCert, GLOBAL_STATE.caKey, subject, []string{cmd.Host})
+	certPEM, keyPEM, err := makeOperatorCert(GLOBAL_STATE.caCert, GLOBAL_STATE.caKey, subject, []string{args.Host})
 	if err != nil {
 		log.Error("Failed to create Operator Certificate", "error", err)
 	}
@@ -54,7 +52,7 @@ func NewOperator(cmd *NewOperatorCmd) {
 
 	// Prepare the template
 	template := OperatorTemplate{
-		Host:              cmd.Host,
+		Host:              args.Host,
 		Port:              args.Port,
 		Certificate:       string(certPEM.Bytes()),
 		PrivateKey:        string(keyPEM.Bytes()),

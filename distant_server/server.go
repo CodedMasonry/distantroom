@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"fmt"
 	"io"
 	"net/http"
@@ -38,10 +39,11 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func runServer(port uint16) {
-	// Handler
+	// Handler Config
 	handler := http.NewServeMux()
 	handler.HandleFunc("/status", statusHandler)
 
+	// Root CA Config
 	caCertFile, err := os.ReadFile(CONFIG_PATH + "/ca.cert")
 	if err != nil {
 		// Retry with new CA
@@ -53,26 +55,38 @@ func runServer(port uint16) {
 	}
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCertFile)
-
+	// TLS Config
 	tlsConfig := &tls.Config{
 		ClientCAs:  caCertPool,
 		ClientAuth: tls.RequireAndVerifyClientCert,
 		MinVersion: tls.VersionTLS13,
 	}
-
+	// Logging Config
 	logger := log.NewWithOptions(os.Stderr, log.Options{Prefix: "HTTPS", TimeFormat: time.Stamp})
+	logger.SetReportTimestamp(true)
 	stdlog := logger.StandardLog(log.StandardLogOptions{
 		ForceLevel: log.ErrorLevel,
 	})
-
+	// Server Config
 	server := http.Server{
 		Addr:      fmt.Sprintf(":%d", port),
 		Handler:   handler,
 		TLSConfig: tlsConfig,
 		ErrorLog:  stdlog,
 	}
-	log.WithPrefix("HTTPS").Info("Listening on :%d\n", port)
-	if err := server.ListenAndServeTLS("", ""); err != nil {
-
+	// Server Certificate
+	if _, err := os.Stat(CONFIG_PATH + "/server.cert"); err != nil {
+		subject := &pkix.Name{
+			CommonName: args.Host,
+		}
+		if err := makeServerCert(subject); err != nil {
+			log.Fatal("Failed to create server certificate", "error", err)
+		}
+		log.Info("Created Server Certificate", "path", CONFIG_PATH+"/server.cert")
+	}
+	// Start the Server
+	logger.Infof("Listening on :%d\n", port)
+	if err := server.ListenAndServeTLS(CONFIG_PATH+"/server.cert", CONFIG_PATH+"/server.key"); err != nil {
+		logger.Fatal("Server Stopped", "error", err)
 	}
 }
