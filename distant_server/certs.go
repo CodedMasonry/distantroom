@@ -57,10 +57,10 @@ func makeCA(subject *pkix.Name) (*x509.Certificate, *ecdsa.PrivateKey, error) {
 	return template, caKey, nil
 }
 
-func makeOperatorCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject *pkix.Name, hosts []string, fileName string) error {
+func makeOperatorCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject *pkix.Name, hosts []string) (*bytes.Buffer, *bytes.Buffer, error) {
 	serial, err := generateSerialNumber()
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	template := &x509.Certificate{
@@ -85,48 +85,63 @@ func makeOperatorCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject
 	certKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
 		log.Error("Failed to generate encryption key", "error", err)
-		return err
+		return nil, nil, err
 	}
 
 	certBytes, err := x509.CreateCertificate(rand.Reader, template, caCert, &certKey.PublicKey, caKey)
 	if err != nil {
 		log.Error("Failed to generate certificate", "error", err)
-		return err
+		return nil, nil, err
 	}
 
-	// Logging handled in function
-	if err := saveCert(certBytes, caKey, "operators/"+fileName); err != nil {
-		return err
+	// Encode Public
+	certPEM := new(bytes.Buffer)
+	pem.Encode(certPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certBytes,
+	})
+
+	// Encode Private
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(certKey)
+	if err != nil {
+		log.Error("Failed to parse private key", "error", err)
+		return nil, nil, err
 	}
 
-	return nil
+	privateKeyPEM := new(bytes.Buffer)
+	pem.Encode(privateKeyPEM, &pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: keyBytes,
+	})
+
+	return certPEM, privateKeyPEM, err
 }
 
 func saveCert(certBytes []byte, key *ecdsa.PrivateKey, name string) error {
 	// Encode Public
-	caPEM := new(bytes.Buffer)
-	pem.Encode(caPEM, &pem.Block{
+	certPEM := new(bytes.Buffer)
+	pem.Encode(certPEM, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: certBytes,
 	})
-	if err := os.WriteFile(CONFIG_PATH+"/"+name+".cert", caPEM.Bytes(), 0640); err != nil {
+	if err := os.WriteFile(CONFIG_PATH+"/"+name+".cert", certPEM.Bytes(), 0640); err != nil {
 		log.Error("Failed to save certificae", "error", err)
 		return err
 	}
 
 	// Encode Private
-	caKeyBytes, err := x509.MarshalPKCS8PrivateKey(key)
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(key)
 	if err != nil {
 		log.Error("Failed to parse private key", "error", err)
 		return err
 	}
 
-	PrivateKeyPEM := new(bytes.Buffer)
-	pem.Encode(PrivateKeyPEM, &pem.Block{
+	privateKeyPEM := new(bytes.Buffer)
+	pem.Encode(privateKeyPEM, &pem.Block{
 		Type:  "PRIVATE KEY",
-		Bytes: caKeyBytes,
+		Bytes: keyBytes,
 	})
-	if err := os.WriteFile(CONFIG_PATH+"/"+name+".key", PrivateKeyPEM.Bytes(), 0640); err != nil {
+	if err := os.WriteFile(CONFIG_PATH+"/"+name+".key", privateKeyPEM.Bytes(), 0640); err != nil {
 		log.Error("Failed to save certificae", "error", err)
 		return err
 	}

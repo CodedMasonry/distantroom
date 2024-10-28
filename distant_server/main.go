@@ -43,14 +43,11 @@ func initMain() {
 		logger.SetReportCaller(true)
 		logger.SetLevel(log.DebugLevel)
 	} else {
-		logger.SetLevel(log.DebugLevel)
+		logger.SetLevel(log.InfoLevel)
 	}
 	log.SetDefault(logger)
 
 	if err := os.MkdirAll(CONFIG_PATH, 0740); err != nil {
-		log.Fatal("Failed to create Configuration Directory", "error", err)
-	}
-	if err := os.MkdirAll(CONFIG_PATH+"/operators/", 0740); err != nil {
 		log.Fatal("Failed to create Configuration Directory", "error", err)
 	}
 }

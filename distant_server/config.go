@@ -23,7 +23,6 @@ func initState() {
 		log.Fatal("Failed to create CA", "error", err)
 	}
 	log.Debug("Certificate Authority Loaded")
-	log.Info("Config loaded")
 
 	GLOBAL_STATE = State{
 		caCert: caCert,

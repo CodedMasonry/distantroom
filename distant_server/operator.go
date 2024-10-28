@@ -13,10 +13,10 @@ import (
 
 // CLI format
 type NewOperatorCmd struct {
-	output string `arg:"-o, --output" help:"Directory to output file; defaults to current directory"`
-	host   string `arg:"-h, --host" help:"The host that the client should connect to; defaults to 0.0.0.0"`
-	port   uint16 `arg:"-p, --port" help:"The port the client should connect to; defaults to 8080"`
-	name   string `arg:"-n, --name" help:"Name of the file; defaults to date + random number"`
+	Output string `arg:"--output" help:"Directory to output file" default:"."`
+	Host   string `arg:"-h, --host" help:"The host that the client should connect to" default:"0.0.0.0"`
+	Port   uint16 `arg:"-p, --port" help:"The port the client should connect to" default:"8080"`
+	Name   string `arg:"-n, --name" help:"Name of the file"`
 }
 
 // The TOML template for `operator.toml` files
@@ -37,33 +37,17 @@ func NewOperator(cmd *NewOperatorCmd) {
 	}
 
 	// Handling default values
-	if cmd.output == "" {
-		cmd.output = "."
-	}
-	if cmd.host == "" {
-		cmd.host = "0.0.0.0"
-	}
-	if cmd.port == 0 {
-		cmd.port = 8080
-	}
-	if cmd.name == "" {
-		cmd.name = time.Now().Format(time.DateOnly) + "-" + fmt.Sprint(rand.UintN(4096))
+	if cmd.Name == "" {
+		cmd.Name = time.Now().Format(time.DateOnly) + "-" + fmt.Sprint(rand.UintN(4096))
 	}
 
 	// Generate a certificate for client
-	if err := makeOperatorCert(GLOBAL_STATE.caCert, GLOBAL_STATE.caKey, subject, []string{cmd.host}, cmd.name); err != nil {
+	certPEM, keyPEM, err := makeOperatorCert(GLOBAL_STATE.caCert, GLOBAL_STATE.caKey, subject, []string{cmd.Host})
+	if err != nil {
 		log.Error("Failed to create Operator Certificate", "error", err)
 	}
 
 	// Load all the PEM files
-	certPEM, err := os.ReadFile(CONFIG_PATH + "/operators/" + cmd.name + ".cert")
-	if err != nil {
-		log.Fatal("Failed to load file", "error", err)
-	}
-	keyPEM, err := os.ReadFile(CONFIG_PATH + "/operators/" + cmd.name + ".key")
-	if err != nil {
-		log.Fatal("Failed to load file", "error", err)
-	}
 	caPEM, err := os.ReadFile(CONFIG_PATH + "/ca.cert")
 	if err != nil {
 		log.Fatal("Failed to load file", "error", err)
@@ -71,10 +55,10 @@ func NewOperator(cmd *NewOperatorCmd) {
 
 	// Prepare the template
 	template := OperatorTemplate{
-		Host:              cmd.host,
-		Port:              cmd.port,
-		Certificate:       string(certPEM),
-		PrivateKey:        string(keyPEM),
+		Host:              cmd.Host,
+		Port:              cmd.Port,
+		Certificate:       string(certPEM.Bytes()),
+		PrivateKey:        string(keyPEM.Bytes()),
 		ServerCertificate: string(caPEM),
 	}
 
@@ -85,9 +69,9 @@ func NewOperator(cmd *NewOperatorCmd) {
 	}
 
 	// Write to `output` directory
-	path := cmd.output + "/" + cmd.name + ".toml"
+	path := cmd.Output + "/" + cmd.Name + ".toml"
 	if err := os.WriteFile(path, bytes, 0640); err != nil {
 		log.Fatal("Failed to write config to file", "error", err)
 	}
-	log.Info("Configuration saved", "path", path)
+	log.Info("Operator Saved", "path", path)
 }
