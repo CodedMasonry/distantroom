@@ -12,9 +12,6 @@ type State struct {
 	caKey  *ecdsa.PrivateKey
 }
 
-type Config struct {
-}
-
 var GLOBAL_STATE State
 
 func initState() {
@@ -22,7 +19,7 @@ func initState() {
 	if err != nil {
 		log.Fatal("Failed to create CA", "error", err)
 	}
-	log.Debug("Certificate Authority Loaded")
+	log.Info("Root Certificate Loaded")
 
 	GLOBAL_STATE = State{
 		caCert: caCert,

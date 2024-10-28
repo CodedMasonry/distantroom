@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/x509"
 	"os"
 	"time"
 
@@ -13,12 +12,12 @@ import (
 var CONFIG_PATH = xdg.ConfigHome + "/distantroom"
 var args struct {
 	NewOperator *NewOperatorCmd `arg:"subcommand:new-operator"`
+	Port        uint16          `arg:"--port" help:"Port to listen on" default:"3000"`
 	Debug       bool            `arg:"-d, --debug" help:"sets log level to debug"`
 }
 
 func main() {
 	arg.MustParse(&args)
-
 	// Inits Logging
 	initMain()
 	// Inits Config
@@ -31,7 +30,7 @@ func main() {
 		NewOperator(args.NewOperator)
 	default:
 		log.Info("Starting Server")
-		runServer()
+		runServer(args.Port)
 	}
 }
 
@@ -50,19 +49,4 @@ func initMain() {
 	if err := os.MkdirAll(CONFIG_PATH, 0740); err != nil {
 		log.Fatal("Failed to create Configuration Directory", "error", err)
 	}
-}
-
-func runServer() {
-	caCertFile, err := os.ReadFile(CONFIG_PATH + "/ca.cert")
-	if err != nil {
-		// Retry with new CA
-		NewCA()
-		caCertFile, err = os.ReadFile(CONFIG_PATH + "/ca.cert")
-		if err != nil {
-			log.Fatal("Failed to create CA Cert", "error", err)
-		}
-	}
-
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCertFile)
 }

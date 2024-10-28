@@ -1,7 +1,7 @@
 # Host that the server is listening on
 host = '0.0.0.0'
 # Port the server is listening on
-port = 8080
+port = 3000
 # The Client's Certificate
 certificate = "-----BEGIN CERTIFICATE-----\n-----END CERTIFICATE-----\n"
 # The Client's Private Key

@@ -15,7 +15,6 @@ import (
 type NewOperatorCmd struct {
 	Output string `arg:"--output" help:"Directory to output file" default:"."`
 	Host   string `arg:"-h, --host" help:"The host that the client should connect to" default:"0.0.0.0"`
-	Port   uint16 `arg:"-p, --port" help:"The port the client should connect to" default:"8080"`
 	Name   string `arg:"-n, --name" help:"Name of the file"`
 }
 
@@ -56,7 +55,7 @@ func NewOperator(cmd *NewOperatorCmd) {
 	// Prepare the template
 	template := OperatorTemplate{
 		Host:              cmd.Host,
-		Port:              cmd.Port,
+		Port:              args.Port,
 		Certificate:       string(certPEM.Bytes()),
 		PrivateKey:        string(keyPEM.Bytes()),
 		ServerCertificate: string(caPEM),

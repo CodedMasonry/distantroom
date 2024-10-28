@@ -19,45 +19,11 @@ import (
 
 var MaxSerialNumber = big.NewInt(0).SetBytes(bytes.Repeat([]byte{255}, 20))
 
-func makeCA(subject *pkix.Name) (*x509.Certificate, *ecdsa.PrivateKey, error) {
-	serial, err := generateSerialNumber()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	template := &x509.Certificate{
-		SerialNumber:          serial,
-		Subject:               *subject,
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(time.Hour * 24 * 365),
-		IsCA:                  true,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		BasicConstraintsValid: true,
-	}
-
-	// Generate Cert
-	caKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
-	if err != nil {
-		log.Error("Failed to generate encryption key", "error", err)
-		return nil, nil, err
-	}
-
-	caBytes, err := x509.CreateCertificate(rand.Reader, template, template, &caKey.PublicKey, caKey)
-	if err != nil {
-		log.Error("Failed to generate certificate", "error", err)
-		return nil, nil, err
-	}
-
-	// Logging handled in function
-	if err := saveCert(caBytes, caKey, "ca"); err != nil {
-		return nil, nil, err
-	}
-
-	return template, caKey, nil
-}
-
-func makeOperatorCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject *pkix.Name, hosts []string) (*bytes.Buffer, *bytes.Buffer, error) {
+// Generates a template Certificate & a Keypair.
+//
+// If hosts are provided, they are added to the certificate
+// else if nil, none are added.
+func templateCertificate(subject *pkix.Name, hosts *[]string) (*x509.Certificate, *ecdsa.PrivateKey, error) {
 	serial, err := generateSerialNumber()
 	if err != nil {
 		return nil, nil, err
@@ -72,11 +38,13 @@ func makeOperatorCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 	}
 
-	for _, h := range hosts {
-		if ip := net.ParseIP(h); ip != nil {
-			template.IPAddresses = append(template.IPAddresses, ip)
-		} else {
-			template.DNSNames = append(template.DNSNames, h)
+	if hosts != nil {
+		for _, h := range *hosts {
+			if ip := net.ParseIP(h); ip != nil {
+				template.IPAddresses = append(template.IPAddresses, ip)
+			} else {
+				template.DNSNames = append(template.DNSNames, h)
+			}
 		}
 	}
 	log.Debug("Generating Certificate")
@@ -85,6 +53,35 @@ func makeOperatorCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject
 	certKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
 		log.Error("Failed to generate encryption key", "error", err)
+		return nil, nil, err
+	}
+
+	return template, certKey, nil
+}
+
+func makeCA(subject *pkix.Name) (*x509.Certificate, *ecdsa.PrivateKey, error) {
+	template, certKey, err := templateCertificate(subject, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	certBytes, err := x509.CreateCertificate(rand.Reader, template, template, &certKey.PublicKey, certKey)
+	if err != nil {
+		log.Error("Failed to generate certificate", "error", err)
+		return nil, nil, err
+	}
+
+	// Logging handled in function
+	if err := saveCert(certBytes, certKey, "ca"); err != nil {
+		return nil, nil, err
+	}
+
+	return template, certKey, nil
+}
+
+func makeOperatorCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject *pkix.Name, hosts []string) (*bytes.Buffer, *bytes.Buffer, error) {
+	template, certKey, err := templateCertificate(subject, &hosts)
+	if err != nil {
 		return nil, nil, err
 	}
 
@@ -173,12 +170,12 @@ func LoadCA() (*x509.Certificate, *ecdsa.PrivateKey, error) {
 	log.Debug("Loading Certificate Authority", "path", CONFIG_PATH+"/ca.cert")
 	certFile, err := os.ReadFile(CONFIG_PATH + "/ca.cert")
 	if err != nil {
-		log.Warn("File doesn't exist")
+		log.Warn("Root Certificate doesn't exist; Generating...")
 		return NewCA()
 	}
 	keyFile, err := os.ReadFile(CONFIG_PATH + "/ca.key")
 	if err != nil {
-		log.Warn("File doesn't exist")
+		log.Warn("Root Certificate doesn't exist; Generating...")
 		return NewCA()
 	}
 
