@@ -22,14 +22,14 @@ pub static PRINTER: LazyLock<ExternalPrinter<String>> = LazyLock::new(|| Externa
 // directories
 pub static CONFIG_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     let mut dir = dirs::config_dir().unwrap();
-    dir.push("distant_operator");
+    dir.push("distantroom");
     fs::create_dir_all(dir.clone()).unwrap();
 
     dir
 });
 pub static PROFILE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     let mut dir = dirs::config_dir().unwrap();
-    dir.push("distant_operator");
+    dir.push("distantroom");
     dir.push("profiles");
     fs::create_dir_all(dir.clone()).unwrap();
 
@@ -39,7 +39,7 @@ pub static PROFILE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
 #[derive(Debug)]
 pub struct Profile {
     path: PathBuf,
-    inner: ProfileInner,
+    pub inner: ProfileInner,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -64,15 +64,29 @@ impl Profile {
         Ok(())
     }
 
+    pub fn get_client_cert(&self) -> String {
+        self.inner.certificate.clone()
+    }
+
+    pub fn get_client_key(&self) -> String {
+        self.inner.private_key.clone()
+    }
+
+    pub fn get_root_cert(&self) -> String {
+        self.inner.server_certificate.clone()
+    }
+
     pub fn write_to(&self, path: PathBuf) -> Result<(), anyhow::Error> {
-        if fs::exists(path.clone()).unwrap_or_default() && !Confirm::new(format!(
+        if fs::exists(path.clone()).unwrap_or_default()
+            && !Confirm::new(format!(
                 "The file {:?} already exists; Do you want to replace it?",
                 path.file_name().unwrap()
             ))
             .prompt()?
             .run()?
             .to_lowercase()
-            .contains('y') {
+            .contains('y')
+        {
             return Ok(());
         }
 
