@@ -17,7 +17,7 @@ pub mod server;
 
 // internal
 pub static LOGGER: Logger = Logger;
-pub static PRINTER: LazyLock<ExternalPrinter<String>> = LazyLock::new(|| ExternalPrinter::new(8));
+pub static PRINTER: LazyLock<ExternalPrinter<String>> = LazyLock::new(|| ExternalPrinter::new(64));
 
 // directories
 pub static CONFIG_DIR: LazyLock<PathBuf> = LazyLock::new(|| {

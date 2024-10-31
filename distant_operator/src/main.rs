@@ -1,5 +1,5 @@
 #![deny(clippy::all)]
-use std::{path::PathBuf, process, thread};
+use std::{path::PathBuf, process, thread, time::Duration};
 
 use clap::{Parser, Subcommand};
 use distant_operator::{server, Profile, LOGGER, PROFILE_DIR};
@@ -29,12 +29,6 @@ fn main() -> Result<(), anyhow::Error> {
     log::set_max_level(log::LevelFilter::Debug);
     parse_root()?;
 
-    let profile = distant_operator::select_profile()?;
-    thread::spawn(move || match server::connect(&profile) {
-        Ok(_) => todo!(),
-        Err(e) => error!("Error Connecting to client\n{:#?}", e),
-    });
-
     // Init Readline
     let mut line_editor = Reedline::create()
         .with_external_printer(distant_operator::PRINTER.clone())
@@ -42,6 +36,12 @@ fn main() -> Result<(), anyhow::Error> {
             DefaultHinter::default().with_style(Color::LightGray.italic().dimmed()),
         ));
     let prompt = DefaultPrompt::default();
+
+    let profile = distant_operator::select_profile()?;
+    thread::spawn(move || match server::connect(&profile) {
+        Ok(_) => todo!(),
+        Err(e) => error!("Error Connecting to client\n{:#?}", e),
+    });
 
     // Handle Readline
     loop {

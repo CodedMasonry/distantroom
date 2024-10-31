@@ -35,5 +35,5 @@ pub fn log_prefix<'a>(level: Level) -> AnsiGenericString<'a, str> {
 }
 
 fn print_terminal(str: String) -> Result<(), crossbeam_channel::SendError<String>> {
-    crate::PRINTER.sender().send(str)
+    crate::PRINTER.print(str)
 }

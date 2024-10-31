@@ -50,7 +50,7 @@ func templateCertificate(subject *pkix.Name, hosts *[]string) (*x509.Certificate
 	log.Debug("Generating Certificate")
 
 	// Generate Cert
-	certKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	certKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		log.Error("Failed to generate encryption key", "error", err)
 		return nil, nil, err
@@ -60,8 +60,27 @@ func templateCertificate(subject *pkix.Name, hosts *[]string) (*x509.Certificate
 }
 
 func makeCA(subject *pkix.Name) (*x509.Certificate, *ecdsa.PrivateKey, error) {
-	template, certKey, err := templateCertificate(subject, nil)
+	serial, err := generateSerialNumber()
 	if err != nil {
+		return nil, nil, err
+	}
+
+	template := &x509.Certificate{
+		SerialNumber:          serial,
+		Subject:               *subject,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Hour * 24 * 365),
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+	}
+	log.Debug("Generating Certificate")
+
+	// Generate Cert
+	certKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		log.Error("Failed to generate encryption key", "error", err)
 		return nil, nil, err
 	}
 
