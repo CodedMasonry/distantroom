@@ -1,8 +1,8 @@
 #![deny(clippy::all)]
-use std::{path::PathBuf, process, thread, time::Duration};
+use std::{path::PathBuf, process, thread};
 
 use clap::{Parser, Subcommand};
-use distant_operator::{server, Profile, LOGGER, PROFILE_DIR};
+use distant_operator::{server::{self, Server}, Profile, LOGGER, PROFILE_DIR};
 use log::{error, info};
 use nu_ansi_term::Color;
 use reedline::{DefaultHinter, DefaultPrompt, Reedline, Signal};
@@ -38,10 +38,7 @@ fn main() -> Result<(), anyhow::Error> {
     let prompt = DefaultPrompt::default();
 
     let profile = distant_operator::select_profile()?;
-    thread::spawn(move || match server::connect(&profile) {
-        Ok(_) => todo!(),
-        Err(e) => error!("Error Connecting to client\n{:#?}", e),
-    });
+    let server = Server::connect(&profile)?;
 
     // Handle Readline
     loop {

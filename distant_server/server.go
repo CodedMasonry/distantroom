@@ -30,12 +30,6 @@ func runServer(host string, port uint16) {
 	})
 
 	app.Get("/ws/:id", websocket.New(func(c *websocket.Conn) {
-		// c.Locals is added to the *websocket.Conn
-		log.Print(c.Locals("allowed"))  // true
-		log.Print(c.Params("id"))       // 123
-		log.Print(c.Query("v"))         // 1.0
-		log.Print(c.Cookies("session")) // ""
-
 		// websocket.Conn bindings https://pkg.go.dev/github.com/fasthttp/websocket?tab=doc#pkg-index
 		var (
 			mt  int
@@ -44,7 +38,7 @@ func runServer(host string, port uint16) {
 		)
 		for {
 			if mt, msg, err = c.ReadMessage(); err != nil {
-				log.Printf("read: %v", err)
+				log.Printf("error: %v", err)
 				break
 			}
 			log.Printf("recv: %s", msg)
