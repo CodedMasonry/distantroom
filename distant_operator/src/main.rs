@@ -1,9 +1,9 @@
 #![deny(clippy::all)]
-use std::{path::PathBuf, process};
+use std::{path::PathBuf, process, thread};
 
 use clap::{Parser, Subcommand};
-use distant_operator::{Profile, LOGGER, PROFILE_DIR};
-use log::info;
+use distant_operator::{server, Profile, LOGGER, PROFILE_DIR};
+use log::{error, info};
 use nu_ansi_term::Color;
 use reedline::{DefaultHinter, DefaultPrompt, Reedline, Signal};
 
@@ -29,7 +29,11 @@ fn main() -> Result<(), anyhow::Error> {
     log::set_max_level(log::LevelFilter::Debug);
     parse_root()?;
 
-    let _profile = distant_operator::select_profile()?;
+    let profile = distant_operator::select_profile()?;
+    thread::spawn(move || match server::connect(&profile) {
+        Ok(_) => todo!(),
+        Err(e) => error!("Error Connecting to client\n{:#?}", e),
+    });
 
     // Init Readline
     let mut line_editor = Reedline::create()

@@ -1,6 +1,5 @@
-use futures_util::{SinkExt, StreamExt, TryStreamExt};
+use log::debug;
 use reqwest::{Certificate, Identity};
-use reqwest_websocket::{Message, RequestBuilderExt};
 
 use crate::Profile;
 
@@ -19,33 +18,18 @@ pub async fn connect(profile: &Profile) -> Result<(), anyhow::Error> {
         .use_rustls_tls()
         .build()?;
 
+    debug!("Connecting to Server...");
     let response = client
         .get(format!(
-            "wss://{}:{}/ws",
+            "https://{}:{}/status",
             profile.inner.host.clone(),
             profile.inner.port
         ))
-        .upgrade()
         .send()
-        .await?
-        .into_websocket()
         .await?;
 
-    let (mut tx, mut rx) = response.split();
-
-    tokio::task::spawn_local(async move {
-        for i in 1..11 {
-            tx.send(Message::Text(format!("Hello, World! #{i}")))
-                .await
-                .unwrap();
-        }
-    });
-
-    while let Some(message) = rx.try_next().await? {
-        if let Message::Text(text) = message {
-            println!("received: {text}");
-        }
-    }
+    debug!("Response Received!");
+    debug!("{:#?}", response);
 
     Ok(())
 }

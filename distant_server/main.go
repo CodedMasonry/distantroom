@@ -30,7 +30,7 @@ func main() {
 		log.Info("Generating New Operator")
 		NewOperator(args.NewOperator)
 	default:
-		runServer(args.Port)
+		runServer(args.Host, args.Port)
 	}
 }
 

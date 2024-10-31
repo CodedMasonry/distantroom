@@ -79,13 +79,13 @@ func makeCA(subject *pkix.Name) (*x509.Certificate, *ecdsa.PrivateKey, error) {
 	return template, certKey, nil
 }
 
-func makeServerCert(subject *pkix.Name) error {
-	template, certKey, err := templateCertificate(subject, nil)
+func makeServerCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject *pkix.Name, hosts []string) error {
+	template, certKey, err := templateCertificate(subject, &hosts)
 	if err != nil {
 		return err
 	}
 
-	certBytes, err := x509.CreateCertificate(rand.Reader, template, template, &certKey.PublicKey, certKey)
+	certBytes, err := x509.CreateCertificate(rand.Reader, template, caCert, &certKey.PublicKey, caKey)
 	if err != nil {
 		log.Error("Failed to generate certificate", "error", err)
 		return err
@@ -96,7 +96,7 @@ func makeServerCert(subject *pkix.Name) error {
 		return err
 	}
 
-	return nil
+	return err
 }
 
 func makeOperatorCert(caCert *x509.Certificate, caKey *ecdsa.PrivateKey, subject *pkix.Name, hosts []string) (*bytes.Buffer, *bytes.Buffer, error) {
